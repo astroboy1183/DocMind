@@ -6,6 +6,7 @@ class Settings(BaseSettings):
 
     # models (filled in properly in later phases)
     embedding_model: str = "BAAI/bge-small-en-v1.5"
+    reranker_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
     llm_model: str = "claude-sonnet-4-6"
     anthropic_api_key: str | None = None
 

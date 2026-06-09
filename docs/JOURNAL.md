@@ -21,6 +21,85 @@
 | 4 | Package wheel failed to build (all `uv run` broke) | `[project.scripts]` set to a **file path** `"src/docmind/__init__.py"` (must be `module:function`) | removed the `[project.scripts]` section |
 | 5 | Build still failed after fix #4 | stale cached wheel of the broken build | `uv lock` + `uv run --reinstall-package docmind …` |
 | 6 | Root cluttered with 10 `.md` files | docs created incrementally | moved to `docs/`, then consolidated to 3 files |
+| 7 | `ImportError: cannot import name 'FakeEmbedder'` | `embedder.py` and `pipeline.py` were left empty | implemented the two missing files |
+| 8 | BM25 keyword test asserted wrong top hit | 2-doc corpus is degenerate: a term in half the docs gets IDF≈0, so all scores tie | gave the test a 4-doc corpus so the target term is distinctive |
+
+---
+
+## 2026-06-09 — Phase 2: Retrieval (hybrid + rerank)
+
+**Goal:** `Retriever.search(query, k)` → ranked relevant `Passage`s via
+dense + keyword + RRF fusion + cross-encoder rerank + metadata filtering. Decided
+to bring in **real embeddings now** (the Phase-1 fakes can't validate relevance).
+
+**Done**
+- Deps: `sentence-transformers` (+ torch), `numpy`, `rank-bm25`.
+- `ingest/embedder.py` — `SentenceTransformerEmbedder` (default `BAAI/bge-small-en-v1.5`)
+  behind the existing `Embedder` Protocol; lazy model load via `cached_property`
+  (keeps torch out of `import docmind`); normalized vectors; batched. `FakeEmbedder` kept for tests.
+- `config.py` — added `reranker_model` (`cross-encoder/ms-marco-MiniLM-L-6-v2`).
+- `retrieve/dense.py` — cosine NN over `store.all()` (NumPy); same embedder as ingest.
+- `retrieve/keyword.py` — BM25 over chunk text (index built per call; fine for in-memory store).
+- `retrieve/hybrid.py` — Reciprocal Rank Fusion (rank-based, so no dense/BM25 score
+  normalization needed); dedupes by `chunk_id`.
+- `retrieve/rerank.py` — `CrossEncoderReranker`, lazy-loaded; rescores (query, chunk) pairs.
+- `retrieve/retriever.py` — facade: embed → dense + keyword → RRF → metadata filter →
+  optional rerank → top-n. One `search()` shape; strategies swappable behind it.
+
+**Verification**
+- 8 retrieval tests (dense ranking via stub embedder, real BM25, RRF dedupe/order,
+  metadata filter, facade) + Phase-1 tests — all green. No model download in CI.
+- Manual real-embedding run on `samples/hello.txt`: hybrid surfaced the right
+  region; **cross-encoder rerank promoted the grounding/citations chunk (`hello:0`)
+  to #1** — rerank measurably reorders toward relevance (Phase-2 exit criterion).
+
+**Design lessons locked**
+- Same embedder for query + docs (model mismatch silently wrecks relevance).
+- RRF fuses heterogeneous scores without normalization — why it's the standard fuser.
+- Heavy models lazy-loaded so import stays cheap and CI needs no downloads.
+
+**Not done yet (next steps):** bge query-instruction prefix (quality knob) ·
+persist the BM25 index instead of rebuilding per call · swap `InMemoryStore` →
+Chroma (search moves into the store behind the `VectorStore` interface) ·
+labeled-corpus recall@k check (lands in Phase 4 eval).
+
+---
+
+## 2026-06-08 — Phase 1: ingestion walking skeleton
+
+**Goal:** thinnest end-to-end ingestion path (load → chunk → embed → store → read
+back), to prove the stages connect before building any real component.
+
+**Done**
+- `ingest/embedder.py` — `Embedder` Protocol (the contract) + `FakeEmbedder`
+  (returns trivial `[length, word-count]` vectors).
+- `ingest/store.py` — `VectorStore` Protocol + `InMemoryStore` (dict keyed by
+  `chunk_id` → idempotent overwrite, the seed of re-ingest safety).
+- `ingest/chunker.py` — `chunk_text()`: fixed-size 400-char windows, 50 overlap.
+- `ingest/pipeline.py` — `ingest_file()`: load → chunk → embed → store; depends on
+  the **interfaces**, not the concrete fakes (so they can be swapped later).
+- `samples/hello.txt` — a small fixture document.
+- Ran the skeleton: **5 chunks** stored; overlap visible between chunks; fake
+  vectors correct. End-to-end wiring confirmed.
+
+**Issue hit** — see #7: first run failed with `ImportError` because `embedder.py`
+and `pipeline.py` were still empty. Filling them in fixed it.
+
+**Design lessons locked**
+- Contracts (Protocols) before implementations → components are swappable.
+- Idempotency seeded by keying the store on `chunk_id`.
+
+**Verification:** `ruff check` + `ruff format --check` + `pytest` green; skeleton
+run prints the expected chunks. Committed (`55e7e9a`) and pushed; CI green.
+
+**Workflow decision:** going forward, use a **single short-lived feature branch
+per task** → PR → wait for CI green → squash-merge → delete branch. Keeps `main`
+always-green and gives a clean PR history (no branch-protection enforcement, since
+solo).
+
+**Not done yet (next steps):** real file loaders (`.txt` then PDF via PyMuPDF) ·
+real embeddings · persistent store · structure-aware chunking · file-level
+incremental ingestion (content hashing) · metadata extraction · real tests.
 
 ---
 
