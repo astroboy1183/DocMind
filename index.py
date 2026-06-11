@@ -9,14 +9,14 @@ load_dotenv(dotenv_path=Path(__file__).parent / ".env")
 
 PDF_PATH = Path(__file__).parent / "data" / "PDF-Guide-Node-Andrew-Mead-v3.pdf"
 
-# ── Load ───────────────────────────────────────────────────────────────────────
+#Load
 
 loader = PyPDFLoader(str(PDF_PATH))
 pages = loader.load()
 
 print(f"Loaded {len(pages)} pages from '{PDF_PATH.name}'")
 
-# ── Chunk ──────────────────────────────────────────────────────────────────────
+#Chunk
 
 splitter = RecursiveCharacterTextSplitter(
     chunk_size=1500,
@@ -28,7 +28,7 @@ chunks = splitter.split_documents(pages)
 
 print(f"Split into {len(chunks)} chunks")
 
-# ── Embed & store in Qdrant ────────────────────────────────────────────────────
+#Embed & store in Qdrant
 
 print("Embedding chunks and uploading to Qdrant...")
 
