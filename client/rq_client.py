@@ -1,7 +1,7 @@
 """CLI client for the RAG queue — enqueues a query and polls for the result.
 
 Use this when you want to test the queue from the terminal without the React frontend.
-Requires the RQ worker and Valkey to be running (see 08_RAG_queue/README in main README).
+Requires the RQ worker and Valkey/Redis to be running (start docker compose first).
 """
 
 import time

@@ -7,7 +7,7 @@ from langchain_qdrant import QdrantVectorStore
 
 load_dotenv(dotenv_path=Path(__file__).parent / ".env")
 
-PDF_PATH = Path(__file__).parent / "PDF-Guide-Node-Andrew-Mead-v3.pdf"
+PDF_PATH = Path(__file__).parent / "data" / "PDF-Guide-Node-Andrew-Mead-v3.pdf"
 
 # ── Load ───────────────────────────────────────────────────────────────────────
 
@@ -34,11 +34,11 @@ print("Embedding chunks and uploading to Qdrant...")
 
 embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
 
-vector_store = QdrantVectorStore.from_documents(
+QdrantVectorStore.from_documents(
     documents=chunks,
     embedding=embeddings,
     url="http://localhost:6333",
     collection_name="node_js_guide",
 )
 
-print(f"Done. Collection 'node_js_guide' is ready in Qdrant.")
+print("Done. Collection 'node_js_guide' is ready in Qdrant.")

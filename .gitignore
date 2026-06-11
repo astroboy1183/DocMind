@@ -1,0 +1,29 @@
+# Secrets / local env
+.env
+.env.local
+.env.*.local
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Build output
+dist/
+build/
+
+# Node
+node_modules/
+*.local
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+*.swp
